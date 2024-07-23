@@ -2,7 +2,7 @@ import numpy as np
 
 def print_tableau(tableau):
     """
-    Imprimir la tablas
+    Imprimir la tabla del Simplex.
     """
     print("\nTabla actual del Simplex:")
     print(tableau)
@@ -10,19 +10,18 @@ def print_tableau(tableau):
 
 def simplex(c, A, b):
     """
-    Resolver el metodo simplex
-    
+    Resolver el método Simplex.
     """
     m, n = A.shape
 
-    # Create the tableau
+    # Crear el tableau
     tableau = np.zeros((m + 1, n + m + 1))
     tableau[:-1, :n] = A
     tableau[:-1, n:n + m] = np.eye(m)
     tableau[:-1, -1] = b
     tableau[-1, :n] = -c
 
-    print_tableau(tableau)  # Print incial table 
+    print_tableau(tableau)  # Imprimir tabla inicial
 
     while True:
         if np.all(tableau[-1, :-1] >= 0):
@@ -31,7 +30,7 @@ def simplex(c, A, b):
         pivot_col = np.argmin(tableau[-1, :-1])
 
         if np.all(tableau[:-1, pivot_col] <= 0):
-            raise ValueError("Error, intentelo nuevamnete, parece no haber solucion")
+            raise ValueError("Error, intentelo nuevamente, parece no haber solución")
 
         ratios = np.divide(tableau[:-1, -1], tableau[:-1, pivot_col], 
                            out=np.full(m, np.inf), where=tableau[:-1, pivot_col] > 0)
@@ -43,7 +42,7 @@ def simplex(c, A, b):
             if i != pivot_row:
                 tableau[i, :] -= tableau[i, pivot_col] * tableau[pivot_row, :]
 
-        print_tableau(tableau)  # Print tableau after each pivot
+        print_tableau(tableau)  # Imprimir tabla después de cada pivote
 
     solution = np.zeros(n)
     for i in range(n):
@@ -56,51 +55,64 @@ def simplex(c, A, b):
     return solution, optimal_value
 
 def get_user_input():
-    print("Introduce el número de variables de decisión:")
-    n = int(input())
-    
-    print("Introduce el número de restricciones:")
-    m = int(input())
+    while True:
+        try:
+            print("Introduce el número de variables de decisión:")
+            n = int(input())
+            
+            print("Introduce el número de restricciones:")
+            m = int(input())
 
-    print("Introduce los coeficientes de la función objetivo separados por espacios:")
-    c = np.array(list(map(float, input().split())))
+            print("Introduce los coeficientes de la función objetivo separados por espacios:")
+            c = np.array(list(map(float, input().split())))
 
-    print("¿Deseas maximizar o minimizar la función objetivo? (max/min):")
-    objective = input().strip().lower()
+            print("¿Deseas maximizar o minimizar la función objetivo? (max/min):")
+            objective = input().strip().lower()
 
-    if objective == 'min':
-        c = -c
+            if objective not in ['max', 'min']:
+                raise ValueError("Por favor, introduce 'max' o 'min' para la función objetivo.")
 
-    A = np.zeros((m, n))
-    b = np.zeros(m)
-    constraints = []
+            if objective == 'min':
+                c = -c
 
-    for i in range(m):
-        print(f"Introduce los coeficientes de la restricción {i + 1} separados por espacios:")
-        A[i] = np.array(list(map(float, input().split())))
-        print("Selecciona el tipo de restricción:")
-        print("1. <=\n2. =\n3. >=")
-        constraint_type = int(input())
-        constraints.append(constraint_type)
-        print(f"Introduce el valor del término independiente de la restricción {i + 1}:")
-        b[i] = float(input())
+            A = np.zeros((m, n))
+            b = np.zeros(m)
+            constraints = []
 
-        if constraint_type == 3:
-            A[i] = -A[i]
-            b[i] = -b[i]
+            for i in range(m):
+                print(f"Introduce los coeficientes de la restricción {i + 1} separados por espacios:")
+                A[i] = np.array(list(map(float, input().split())))
+                print("Selecciona el tipo de restricción:")
+                print("1. <=\n2. =\n3. >=")
+                constraint_type = int(input())
+                if constraint_type not in [1, 2, 3]:
+                    raise ValueError("Por favor, introduce un tipo de restricción válido (1, 2, 3).")
+                constraints.append(constraint_type)
+                print(f"Introduce el valor del término independiente de la restricción {i + 1}:")
+                b[i] = float(input())
 
-    return c, A, b, constraints, objective
+                if constraint_type == 3:
+                    A[i] = -A[i]
+                    b[i] = -b[i]
+
+            return c, A, b, constraints, objective
+        except ValueError as e:
+            print(e)
+            print("Por favor, inténtelo de nuevo.\n")
 
 def main():
-    c, A, b, constraints, objective = get_user_input()
-    try:
-        solution, optimal_value = simplex(c, A, b)
-        if objective == 'min':
-            optimal_value = -optimal_value
-        print(f"Solución óptima: {solution}")
-        print(f"Valor óptimo de la función objetivo: {optimal_value}")
-    except ValueError as e:
-        print(e)
+    while True:
+        try:
+            c, A, b, constraints, objective = get_user_input()
+            solution, optimal_value = simplex(c, A, b)
+            if objective == 'min':
+                optimal_value = -optimal_value
+            print(f"Solución óptima: {solution}")
+            print(f"Valor óptimo de la función objetivo: {optimal_value}")
+            break
+        except ValueError as e:
+            print(e)
+            print("Error en el proceso. Por favor, inténtelo de nuevo.\n")
 
 if __name__ == "__main__":
     main()
