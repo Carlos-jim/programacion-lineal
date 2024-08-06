@@ -1,104 +1,108 @@
 import numpy as np
-from scipy.optimize import linprog
-import tkinter as tk
-from tkinter import messagebox
 
-class SimplexApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Método Simplex")
-        
-        self.create_widgets()
-        
-    def create_widgets(self):
-        # Labels y entradas para la función objetivo
-        tk.Label(self.root, text="Coeficientes de la función objetivo").grid(row=0, column=0, columnspan=3)
-        
-        self.obj_vars = []
-        for i in range(3):  # Suponiendo 3 variables para simplicidad
-            var = tk.DoubleVar()
-            entry = tk.Entry(self.root, textvariable=var)
-            entry.grid(row=1, column=i)
-            self.obj_vars.append(var)
-        
-        # Labels y entradas para las restricciones
-        tk.Label(self.root, text="Coeficientes de las restricciones").grid(row=2, column=0, columnspan=3)
-        
-        self.constraint_vars = []
-        self.constraint_entries = []
-        for i in range(3):  # Suponiendo 3 restricciones para simplicidad
-            row_vars = []
-            row_entries = []
-            for j in range(3):
-                var = tk.DoubleVar()
-                entry = tk.Entry(self.root, textvariable=var)
-                entry.grid(row=i+3, column=j)
-                row_vars.append(var)
-                row_entries.append(entry)
-            self.constraint_vars.append(row_vars)
-            self.constraint_entries.append(row_entries)
-        
-        # Entradas para los lados derechos de las restricciones
-        tk.Label(self.root, text="Lados derechos de las restricciones").grid(row=2, column=3)
-        
-        self.rhs_vars = []
-        for i in range(3):  # Suponiendo 3 restricciones para simplicidad
-            var = tk.DoubleVar()
-            entry = tk.Entry(self.root, textvariable=var)
-            entry.grid(row=i+3, column=3)
-            self.rhs_vars.append(var)
-        
-        # Botón para resolver
-        tk.Button(self.root, text="Resolver", command=self.solve).grid(row=6, column=0, columnspan=4)
-        
-        # Área para mostrar resultados
-        self.result_text = tk.Text(self.root, height=10, width=50)
-        self.result_text.grid(row=7, column=0, columnspan=4)
-        
-    def solve(self):
-        # Obtener los coeficientes de la función objetivo
-        c = np.array([var.get() for var in self.obj_vars])
-        
-        # Obtener los coeficientes de las restricciones
-        A = np.array([[var.get() for var in row_vars] for row_vars in self.constraint_vars])
-        
-        # Obtener los valores del lado derecho de las restricciones
-        b = np.array([var.get() for var in self.rhs_vars])
-        
-        # Convertir las restricciones a <= en lugar de >=
-        A = -A
-        b = -b
-        
-        # Restricciones de no negatividad
-        bounds = [(0, None)] * len(c)
-        
-        # Resolver el problema de programación lineal
-        result = linprog(c, A_ub=A, b_ub=b, bounds=bounds, method='simplex')
-        
-        # Mostrar los resultados
-        if result.success:
-            result_str = 'La solución óptima es:\n'
-            for i in range(len(c)):
-                result_str += f'X{i+1} = {result.x[i]:.4f}\n'
-            result_str += f'El valor mínimo de Z es: {result.fun:.4f}\n'
-            
-            # Mostrar la tabla final
-            result_str += "\nTabla final (última iteración):\n"
-            result_str += "================================\n"
-            result_str += f"{'Variable':<10} {'Coeficiente':<15} {'Valor':<10}\n"
-            result_str += f"{'-'*35}\n"
-            for i, (coef, val) in enumerate(zip(c, result.x), start=1):
-                result_str += f"{'X' + str(i):<10} {coef:<15} {val:<10.4f}\n"
-            for i, slack in enumerate(result.slack, start=1):
-                result_str += f"{'Slack ' + str(i):<10} {'-':<15} {slack:<10.4f}\n"
-            result_str += f"{'Z':<10} {'':<15} {result.fun:<10.4f}\n"
-        else:
-            result_str = 'No se encontró una solución óptima.'
-        
-        self.result_text.delete(1.0, tk.END)
-        self.result_text.insert(tk.END, result_str)
+def print_tableau(tableau):
+    """
+    Imprimir la tabla
+    """
+    print("\nTabla actual del Simplex:")
+    print(tableau)
+    print()
 
-# Crear la ventana principal
-root = tk.Tk()
-app = SimplexApp(root)
-root.mainloop()
+def simplex(c, A, b):
+    """
+    Resolver el método simplex
+    """
+    m, n = A.shape
+
+    # Crear el tableau
+    tableau = np.zeros((m + 1, n + m + 1))
+    tableau[:-1, :n] = A
+    tableau[:-1, n:n + m] = np.eye(m)
+    tableau[:-1, -1] = b
+    tableau[-1, :n] = -c
+
+    print_tableau(tableau)  # Imprimir tabla inicial 
+
+    while True:
+        if np.all(tableau[-1, :-1] >= 0):
+            break
+
+        pivot_col = np.argmin(tableau[-1, :-1])
+
+        if np.all(tableau[:-1, pivot_col] <= 0):
+            raise ValueError("Error, inténtelo nuevamente, parece no haber solución")
+
+        ratios = np.divide(tableau[:-1, -1], tableau[:-1, pivot_col], 
+                           out=np.full(m, np.inf), where=tableau[:-1, pivot_col] > 0)
+        pivot_row = np.argmin(ratios)
+
+        pivot_element = tableau[pivot_row, pivot_col]
+        tableau[pivot_row, :] /= pivot_element
+        for i in range(m + 1):
+            if i != pivot_row:
+                tableau[i, :] -= tableau[i, pivot_col] * tableau[pivot_row, :]
+
+        print_tableau(tableau)  # Imprimir tabla después de cada pivoteo
+
+    solution = np.zeros(n)
+    for i in range(n):
+        col = tableau[:-1, i]
+        if np.count_nonzero(col) == 1 and np.any(col == 1):
+            solution[i] = tableau[np.where(col == 1)[0][0], -1]
+
+    optimal_value = tableau[-1, -1]
+
+    return solution, optimal_value
+
+def get_user_input():
+    print("Introduce el número de variables de decisión:")
+    n = int(input())
+    
+    print("Introduce el número de restricciones:")
+    m = int(input())
+
+    print("Introduce los coeficientes de la función objetivo separados por espacios:")
+    c = np.array(list(map(float, input().split())))
+
+    print("¿Deseas maximizar o minimizar la función objetivo? (max/min):")
+    objective = input().strip().lower()
+
+    if objective == 'min':
+        c = -c
+
+    A = np.zeros((m, n))
+    b = np.zeros(m)
+    constraints = []
+
+    for i in range(m):
+        print(f"Introduce los coeficientes de la restricción {i + 1} separados por espacios:")
+        A[i] = np.array(list(map(float, input().split())))
+        print("Selecciona el tipo de restricción:")
+        print("1. <=\n2. =\n3. >=")
+        constraint_type = int(input())
+        constraints.append(constraint_type)
+        print(f"Introduce el valor del término independiente de la restricción {i + 1}:")
+        b[i] = float(input())
+
+        if constraint_type == 3:
+            A[i] = -A[i]
+            b[i] = -b[i]
+
+    return c, A, b, constraints, objective
+
+def main():
+    # Suprimir la notación científica en los resultados de impresión
+    np.set_printoptions(suppress=True)
+    
+    c, A, b, constraints, objective = get_user_input()
+    try:
+        solution, optimal_value = simplex(c, A, b)
+        if objective == 'min':
+            optimal_value = -optimal_value
+        print(f"Solución óptima: {solution}")
+        print(f"Valor óptimo de la función objetivo: {optimal_value}")
+    except ValueError as e:
+        print(e)
+
+if __name__ == "__main__":
+    main()
